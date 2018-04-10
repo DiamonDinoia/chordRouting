@@ -6,6 +6,7 @@ import hashlib
 from tabulate import tabulate
 import matplotlib.pyplot as plt
 import numpy as np
+import collections
 
 bits = None
 nodes = None
@@ -15,8 +16,7 @@ log_file = None
 
 # Helper function to determine if a key falls within a range
 def in_range(key, a, b):
-    # is c in [a,b)?, if a == b then it assumes a full circle
-    # on the DHT, so it returns True.
+    # is c in (a,b) mod (2**bits)
     return (a < key < b) if b > a else (key > a or key < b)
 
 
@@ -100,7 +100,7 @@ class Coordinator:
             node.init_finger_table(self.nodes)
 
     def get_graph(self):
-        graph = nx.Graph()
+        graph = nx.DiGraph()
         graph.add_nodes_from(sorted(self.nodes.keys(), reverse=True))
         for node in self.nodes.values():
             graph.add_edges_from([(node.id, x.id) for x in node.get_neighbours()])
@@ -121,8 +121,65 @@ class Coordinator:
         return out + '\n'
 
 
+def calculate_density(graph):
+    return nx.density(graph)
+
+
+def number_connected_components(graph):
+    return nx.number_connected_components(graph.to_undirected())
+
+
+def in_deegree_histogram(graph):
+    degree_sequence = sorted([d for n, d in graph.in_degree()], reverse=True)  # degree sequence
+    degreeCount = collections.Counter(degree_sequence)
+    deg, cnt = zip(*degreeCount.items())
+
+    fig, ax = plt.subplots()
+    plt.bar(deg, cnt, width=0.80, color='b')
+
+    plt.title("In Degree Histogram")
+    plt.ylabel("Count")
+    plt.xlabel("Degree")
+    ax.set_xticks([d + 0.4 for d in deg])
+    ax.set_xticklabels(deg)
+
+    plt.show()
+
+
+def out_deegree_histogram(graph):
+    degree_sequence = sorted([d for n, d in graph.out_degree()], reverse=True)  # degree sequence
+    degreeCount = collections.Counter(degree_sequence)
+    deg, cnt = zip(*degreeCount.items())
+
+    fig, ax = plt.subplots()
+    plt.bar(deg, cnt, width=0.80, color='b')
+
+    plt.title("Out degree Histogram")
+    plt.ylabel("Count")
+    plt.xlabel("Degree")
+    ax.set_xticks([d + 0.4 for d in deg])
+    ax.set_xticklabels(deg)
+
+    plt.show()
+
+
+def calculate_eccentricity(graph):
+   return sum(nx.eccentricity(graph).values())/len(nx.eccentricity(graph).values())
+
+
+def calculate_diameter(graph):
+    return nx.diameter(graph)
+
+
 def main():
     coordinator = Coordinator(nodes, bits)
+    graph = coordinator.get_graph()
+    print(calculate_density(graph))
+    print(number_connected_components(graph))
+    in_deegree_histogram(graph)
+    out_deegree_histogram(graph)
+    print(calculate_eccentricity(graph))
+    print(calculate_diameter(graph))
     # print(coordinator)
     # coordinator.print_ring()
     # plt.show()
@@ -132,16 +189,16 @@ def main():
         node = np.random.choice(list(coordinator.nodes.keys()))
         hops.append([])
         coordinator.nodes[node].find_successor(key, hops[-1])
-        print(*[x.id for x in hops[-1]])
-    hops = [len(x) for x in hops]
-    print(*hops)
+        # print(*[x.id for x in hops[-1]])
+    hops = [len(x)-1 for x in hops]
+    # print(*hops)
     print(sum(hops)/len(hops))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', '--nodes', type=int)
-    parser.add_argument('-b', '--bits', type=int)
+    parser.add_argument('-n', '--nodes', type=int, default=1000)
+    parser.add_argument('-b', '--bits', type=int, default=11)
     parser.add_argument('-s', '--seed', type=int, default=42)
     parser.add_argument('-f', '--filename', type=str, default='./network')
     parser.add_argument('-l', '--log_file', type=str, default='./logfile.txt')
