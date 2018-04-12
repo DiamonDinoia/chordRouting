@@ -7,11 +7,12 @@ from tabulate import tabulate
 import matplotlib.pyplot as plt
 import numpy as np
 import collections
+import operator
 
-bits = None
 nodes = None
 filename = None
 log_file = None
+length = None
 
 
 # Helper function to determine if a key falls within a range
@@ -26,29 +27,30 @@ class Node:
     stats = False
 
     @staticmethod
-    def get_id(id, exp, bits):
-        return (id + (2 ** exp)) % (2 ** bits)
+    def get_id(id, exp, n):
+        if exp == 0:
+            return (id+1) % n
+        return (id + (2 << (exp-1))) % n
 
     def __init__(self, id):
         self.id = id
+        self.n = n
         self.finger_table = OrderedDict()
         self.successor = None
         self.predecessor = None
 
     def init_finger_table(self, nodes):
-        for i in range(0, bits):
-            ind = Node.get_id(self.id, i, self.bits)
+        for i in range(0, self.bits):
+            ind = Node.get_id(self.id, i, self.n)
             node = ind
             while node not in nodes:
-                node = (node + 1) % (2 ** bits)
-                assert(0 <= node < (2 ** bits))
+                node = (node + 1) % self.n
             self.finger_table[ind] = nodes[node]
             if i == 0:
                 self.successor = nodes[node]
         node = self.id
         while True:
-            node = (node-1) % (2**bits)
-            assert(node >= 0)
+            node = (node-1) % self.n
             if node in nodes:
                 self.predecessor = nodes[node]
                 break
@@ -85,17 +87,16 @@ class Node:
 
 class Coordinator:
 
-    def init_nodes(self, nodes, bits):
+    def init_nodes(self, nodes, bits, n):
         Node.bits = bits
         while len(self.nodes) < nodes:
-            key = sha1(random.randrange(0, 2 ** bits))
-            assert(0 <= key < 2 ** bits)
+            key = sha1(random.randrange(0, n))
             if key not in self.nodes:
                 self.nodes[key] = Node(key)
 
-    def __init__(self, nodes, bits):
+    def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
-        self.init_nodes(nodes, bits)
+        self.init_nodes(nodes, bits, n)
         for node in self.nodes.values():
             node.init_finger_table(self.nodes)
 
@@ -125,28 +126,31 @@ def calculate_density(graph):
     return nx.density(graph)
 
 
-def number_connected_components(graph):
-    return nx.number_connected_components(graph.to_undirected())
+# def number_connected_components(graph):
+#     return nx.number_connected_components(graph.to_undirected())
 
 
-def in_deegree_histogram(graph):
+def in_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.in_degree()], reverse=True)  # degree sequence
     degreeCount = collections.Counter(degree_sequence)
     deg, cnt = zip(*degreeCount.items())
 
     fig, ax = plt.subplots()
-    plt.bar(deg, cnt, width=0.80, color='b')
+    plt.bar(deg, cnt, color='b')
 
     plt.title("In Degree Histogram")
     plt.ylabel("Count")
     plt.xlabel("Degree")
-    ax.set_xticks([d + 0.4 for d in deg])
-    ax.set_xticklabels(deg)
+    # ax.set_xticks([d + 0.4 for d in deg])
+    # ax.set_xticklabels(deg)
 
-    plt.show()
+    if figure is None:
+        plt.show()
+    else:
+        plt.savefig(fig)
 
 
-def out_deegree_histogram(graph):
+def out_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.out_degree()], reverse=True)  # degree sequence
     degreeCount = collections.Counter(degree_sequence)
     deg, cnt = zip(*degreeCount.items())
@@ -160,39 +164,77 @@ def out_deegree_histogram(graph):
     ax.set_xticks([d + 0.4 for d in deg])
     ax.set_xticklabels(deg)
 
-    plt.show()
+    if figure is None:
+        plt.show()
+    else:
+        plt.savefig(fig)
 
 
 def calculate_eccentricity(graph):
-   return sum(nx.eccentricity(graph).values())/len(nx.eccentricity(graph).values())
+    return sum(nx.eccentricity(graph).values())/len(nx.eccentricity(graph).values())
 
 
 def calculate_diameter(graph):
     return nx.diameter(graph)
 
 
+def queries_histogram(queries, figure=None):
+    nodes = [item.id for sublist in queries for item in sublist[1:]]
+    nodes = collections.Counter(nodes)
+    nodes = [x for x in nodes.values()]
+    nodes.sort(reverse=True)
+    fig, ax = plt.subplots()
+    plt.bar(range(len(nodes)), nodes, width=0.80, color='b')
+
+    plt.title("Routing Histogram")
+    plt.ylabel("Number of queries routed")
+    ax.set_xticklabels([])
+    if figure is None:
+        plt.show()
+    else:
+        plt.savefig(fig)
+
+
+def last_hop_histogram(queries, figure=None):
+    nodes = [item[-1].id for item in queries]
+    nodes = collections.Counter(nodes)
+    nodes = sorted(nodes.items(), key=operator.itemgetter(1), reverse=True)
+    node, cnt = zip(*nodes)
+    fig, ax = plt.subplots()
+    plt.bar(range(len(cnt)), cnt, color='b')
+    plt.title("Last Hop Histogram")
+    plt.ylabel("Number of queries routed")
+    if figure is None:
+        plt.show()
+    else:
+        plt.savefig(fig)
+
+
 def main():
-    coordinator = Coordinator(nodes, bits)
+    coordinator = Coordinator(nodes, bits, n)
     graph = coordinator.get_graph()
-    print(calculate_density(graph))
-    print(number_connected_components(graph))
-    in_deegree_histogram(graph)
-    out_deegree_histogram(graph)
-    print(calculate_eccentricity(graph))
-    print(calculate_diameter(graph))
+    nx.write_gml(graph, filename)
+    # print(number_connected_components(graph))
     # print(coordinator)
     # coordinator.print_ring()
     # plt.show()
+    in_degree_histogram(graph, 'in_degree_histogram')
+    out_degree_histogram(graph, 'out_degree_histogram')
     hops = []
-    for _ in range(10000):
-        key = sha1(random.randrange(0, 2**bits))
+    for _ in range(length):
+        key = sha1(random.randrange(0, n))
         node = np.random.choice(list(coordinator.nodes.keys()))
         hops.append([])
         coordinator.nodes[node].find_successor(key, hops[-1])
-        # print(*[x.id for x in hops[-1]])
+        with open(log_file, 'w') as f:
+            print(*[x.id for x in hops[-1]], file=f)
+    queries_histogram(hops, 'queries_histogram')
+    last_hop_histogram(hops, 'last_hop_histogram')
     hops = [len(x)-1 for x in hops]
-    # print(*hops)
-    print(sum(hops)/len(hops))
+    print('Average path length', sum(hops)/len(hops))
+    print('Density', calculate_density(graph))
+    print('Eccentricity', calculate_eccentricity(graph))
+    print('Diameter', calculate_diameter(graph))
 
 
 if __name__ == '__main__':
@@ -202,14 +244,20 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', type=int, default=42)
     parser.add_argument('-f', '--filename', type=str, default='./network')
     parser.add_argument('-l', '--log_file', type=str, default='./logfile.txt')
+    parser.add_argument('-d', '--length', type=int, default='10000')
     args = parser.parse_args()
-    print(args)
     bits = args.bits
+    n = 2 << (bits-1)
     nodes = args.nodes
     filename = args.filename
     random.seed(args.seed)
+    log_file = args.log_file
+    length = args.length
+    print('Nodes', nodes)
+    print('Bits', bits)
 
-    def sha1(key, bits=bits):
-        return int(hashlib.sha1(str(key).encode()).hexdigest(), 16) % (2 ** bits)
+    def sha1(key, n=n):
+        return int(hashlib.sha1(str(key).encode()).hexdigest(), 16) % n
+        # return key
 
     main()
