@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import collections
 import operator
+import sys
 
 nodes = None
 filename = None
@@ -19,6 +20,23 @@ length = None
 def in_range(key, a, b):
     # is c in (a,b) mod (2**bits)
     return (a < key < b) if b > a else (key > a or key < b)
+
+
+def binary_search(l, elem):
+    first = 0
+    last = len(l)
+    mid = (last-first)/2
+    while first != last:
+        mid = (last-first)/2
+        if l[mid] == elem:
+            return mid
+        elif l[mid] < elem:
+            last = mid
+        elif l[mid] > elem:
+            first = mid
+    while l[mid] > elem:
+        mid -= 1
+    return mid
 
 
 class Node:
@@ -90,9 +108,14 @@ class Coordinator:
     def init_nodes(self, nodes, bits, n):
         Node.bits = bits
         while len(self.nodes) < nodes:
+            print(len(self.nodes), file=sys.stderr)
+            # key = random.randrange(0, n)
             key = sha1(random.randrange(0, n))
             if key not in self.nodes:
                 self.nodes[key] = Node(key)
+                # print(key, file=sys.stderr)
+            # else:
+            #     print('Nooo', file=sys.stderr)
 
     def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
@@ -212,14 +235,18 @@ def last_hop_histogram(queries, figure=None):
 
 def main():
     coordinator = Coordinator(nodes, bits, n)
+    print('Initialized finished', file=sys.stderr)
     graph = coordinator.get_graph()
+    print('Graph generated', file=sys.stderr)
     nx.write_gml(graph, filename)
+    print('Graph saved', file=sys.stderr)
     # print(number_connected_components(graph))
     # print(coordinator)
     # coordinator.print_ring()
     # plt.show()
     in_degree_histogram(graph, 'in_degree_histogram')
     out_degree_histogram(graph, 'out_degree_histogram')
+    print('Simulation started', file=sys.stderr)
     hops = []
     for _ in range(length):
         key = sha1(random.randrange(0, n))
@@ -228,6 +255,7 @@ def main():
         coordinator.nodes[node].find_successor(key, hops[-1])
         with open(log_file, 'w') as f:
             print(*[x.id for x in hops[-1]], file=f)
+    print('Simulation finished', file=sys.stderr)
     queries_histogram(hops, 'queries_histogram')
     last_hop_histogram(hops, 'last_hop_histogram')
     hops = [len(x)-1 for x in hops]
