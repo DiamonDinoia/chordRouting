@@ -25,21 +25,17 @@ def in_range(key, a, b):
 def binary_search(l, elem):
     first = 0
     last = len(l)-1
-    mid = first + (last - first)/2
     while first <= last:
-        assert (first >= 0 and last >= 0)
-        mid = first + (last - first) / 2
+        mid = (first + last) / 2
         mid = int(mid)
-        if l[mid] == elem:
-            break
-        elif l[mid] < elem:
-            last = mid+1
-        elif l[mid] > elem:
-            first = mid-1
-    while l[mid] >= elem and mid >= 0:
-        mid -= 1
+        if l[mid] >= elem:
+            last = mid-1
+        else:
+            first = mid+1
     # print(l[mid])
-    return l[mid]
+    if first >= len(l):
+        return l[0]
+    return l[first]
 
 
 class Node:
@@ -56,17 +52,14 @@ class Node:
     def __init__(self, id):
         self.id = id
         self.n = n
-        self.finger_table = OrderedDict()
+        self.finger_table = {}
         self.successor = None
         self.predecessor = None
 
     def init_finger_table(self, nodes):
         for i in range(0, self.bits):
             ind = Node.get_id(self.id, i, self.n)
-            node = ind
-            # print(i, node, file=sys.stderr)
-            while node not in nodes:
-                node = (node + 1) % self.n
+            node = binary_search(list(nodes.keys()), ind)
             self.finger_table[ind] = nodes[node]
             if i == 0:
                 self.successor = nodes[node]
@@ -115,6 +108,11 @@ class Coordinator:
             key = sha1(random.randrange(0, n))
             if key not in self.nodes:
                 self.nodes[key] = Node(key)
+        tmp = self.nodes
+        self.nodes = OrderedDict()
+        ordered_keys = sorted(tmp.keys())
+        for key in ordered_keys:
+            self.nodes[key] = tmp[key]
 
     def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
@@ -253,7 +251,7 @@ def main():
         node = np.random.choice(list(coordinator.nodes.keys()))
         hops.append([])
         coordinator.nodes[node].find_successor(key, hops[-1])
-        with open(log_file, 'w') as f:
+        with open(log_file, 'a') as f:
             print(*[x.id for x in hops[-1]], file=f)
     print('Simulation finished', file=sys.stderr)
     queries_histogram(hops, './queries_histogram')
