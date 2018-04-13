@@ -24,19 +24,22 @@ def in_range(key, a, b):
 
 def binary_search(l, elem):
     first = 0
-    last = len(l)
-    mid = (last-first)/2
-    while first != last:
-        mid = (last-first)/2
+    last = len(l)-1
+    mid = first + (last - first)/2
+    while first <= last:
+        assert (first >= 0 and last >= 0)
+        mid = first + (last - first) / 2
+        mid = int(mid)
         if l[mid] == elem:
-            return mid
+            break
         elif l[mid] < elem:
-            last = mid
+            last = mid+1
         elif l[mid] > elem:
-            first = mid
-    while l[mid] > elem:
+            first = mid-1
+    while l[mid] >= elem and mid >= 0:
         mid -= 1
-    return mid
+    # print(l[mid])
+    return l[mid]
 
 
 class Node:
@@ -61,6 +64,7 @@ class Node:
         for i in range(0, self.bits):
             ind = Node.get_id(self.id, i, self.n)
             node = ind
+            # print(i, node, file=sys.stderr)
             while node not in nodes:
                 node = (node + 1) % self.n
             self.finger_table[ind] = nodes[node]
@@ -108,19 +112,15 @@ class Coordinator:
     def init_nodes(self, nodes, bits, n):
         Node.bits = bits
         while len(self.nodes) < nodes:
-            print(len(self.nodes), file=sys.stderr)
-            # key = random.randrange(0, n)
             key = sha1(random.randrange(0, n))
             if key not in self.nodes:
                 self.nodes[key] = Node(key)
-                # print(key, file=sys.stderr)
-            # else:
-            #     print('Nooo', file=sys.stderr)
 
     def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
         self.init_nodes(nodes, bits, n)
         for node in self.nodes.values():
+            # print(node.id, file=sys.stderr)
             node.init_finger_table(self.nodes)
 
     def get_graph(self):
@@ -170,7 +170,7 @@ def in_degree_histogram(graph, figure=None):
     if figure is None:
         plt.show()
     else:
-        plt.savefig(fig)
+        plt.savefig(figure)
 
 
 def out_degree_histogram(graph, figure=None):
@@ -190,7 +190,7 @@ def out_degree_histogram(graph, figure=None):
     if figure is None:
         plt.show()
     else:
-        plt.savefig(fig)
+        plt.savefig(figure)
 
 
 def calculate_eccentricity(graph):
@@ -215,7 +215,7 @@ def queries_histogram(queries, figure=None):
     if figure is None:
         plt.show()
     else:
-        plt.savefig(fig)
+        plt.savefig(figure)
 
 
 def last_hop_histogram(queries, figure=None):
@@ -230,7 +230,7 @@ def last_hop_histogram(queries, figure=None):
     if figure is None:
         plt.show()
     else:
-        plt.savefig(fig)
+        plt.savefig(figure)
 
 
 def main():
@@ -244,8 +244,8 @@ def main():
     # print(coordinator)
     # coordinator.print_ring()
     # plt.show()
-    in_degree_histogram(graph, 'in_degree_histogram')
-    out_degree_histogram(graph, 'out_degree_histogram')
+    in_degree_histogram(graph, './in_degree_histogram')
+    out_degree_histogram(graph, './out_degree_histogram')
     print('Simulation started', file=sys.stderr)
     hops = []
     for _ in range(length):
@@ -256,8 +256,8 @@ def main():
         with open(log_file, 'w') as f:
             print(*[x.id for x in hops[-1]], file=f)
     print('Simulation finished', file=sys.stderr)
-    queries_histogram(hops, 'queries_histogram')
-    last_hop_histogram(hops, 'last_hop_histogram')
+    queries_histogram(hops, './queries_histogram')
+    last_hop_histogram(hops, './last_hop_histogram')
     hops = [len(x)-1 for x in hops]
     print('Average path length', sum(hops)/len(hops))
     print('Density', calculate_density(graph))
