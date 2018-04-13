@@ -22,6 +22,8 @@ def in_range(key, a, b):
     return (a < key < b) if b > a else (key > a or key < b)
 
 
+# Helper function used to determine the closest preceeding node
+# when initializing the finger tables
 def binary_search(l, elem):
     first = 0
     last = len(l)-1
@@ -38,11 +40,13 @@ def binary_search(l, elem):
     return l[first]
 
 
+# Class that models the node in the network
 class Node:
     bits = 0
     verbose = False
     stats = False
 
+    # Static method used to determine the address of the finger table
     @staticmethod
     def get_id(id, exp, n):
         if exp == 0:
@@ -56,23 +60,26 @@ class Node:
         self.successor = None
         self.predecessor = None
 
+    # Since the network is assumed stati after the creation of all the nodes this function is called in order to
+    # fill the nodes finger table
     def init_finger_table(self, nodes):
         for i in range(0, self.bits):
             ind = Node.get_id(self.id, i, self.n)
-            node = binary_search(list(nodes.keys()), ind)
+            node = ind
+            if ind not in nodes:
+                # Optimization in order to find the correct node
+                node = binary_search(list(nodes.keys()), ind)
             self.finger_table[ind] = nodes[node]
             if i == 0:
                 self.successor = nodes[node]
-        node = self.id
-        while True:
-            node = (node-1) % self.n
-            if node in nodes:
-                self.predecessor = nodes[node]
-                break
+        node = binary_search(list(nodes.keys()), self.id-1)
+        self.predecessor = nodes[node]
 
+    # return the neighbours of a node
     def get_neighbours(self):
         return self.finger_table.values()
 
+    # Implemented fallowing the chord pseudocode, it returns the closest preceding node of id
     def close_preceding_node(self, id):
         neighbours = list(self.get_neighbours())
         neighbours.reverse()
@@ -81,6 +88,8 @@ class Node:
                 return node
         return self
 
+    # implemented fallowing the chord pseudocode, it finds the successor od id
+    # Nodes is a parameters used to keep track of the route taken by the query
     def find_successor(self, id, nodes=None):
         if nodes is not None:
             nodes.append(self)
@@ -91,17 +100,20 @@ class Node:
         node = self.close_preceding_node(id)
         return node.find_successor(id, nodes)
 
+    # Override of the to string method in order to have a nice representation of the node
     def __repr__(self):
         t = 'Node ' + str(self.id) + ' Finger table\n'
         t += tabulate([(x, y.id) for x, y in self.finger_table.items()], headers=['Address', 'Node'], tablefmt='orgtbl')
         return str(t) + '\n'
 
+    # Override of the equal method
     def __eq__(self, other):
         return self.id == other.id
 
-
+# Utility class used to initialize and pereform the simulation
 class Coordinator:
 
+    # Helpler function that create and initialize all the nodes of the swarm
     def init_nodes(self, nodes, bits, n):
         Node.bits = bits
         while len(self.nodes) < nodes:
@@ -114,6 +126,7 @@ class Coordinator:
         for key in ordered_keys:
             self.nodes[key] = tmp[key]
 
+    # Simple constructor that perform basic initialization of the data structures
     def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
         self.init_nodes(nodes, bits, n)
@@ -121,6 +134,7 @@ class Coordinator:
             # print(node.id, file=sys.stderr)
             node.init_finger_table(self.nodes)
 
+    # returns a networkx graph representing the chord network
     def get_graph(self):
         graph = nx.DiGraph()
         graph.add_nodes_from(sorted(self.nodes.keys(), reverse=True))
@@ -128,13 +142,16 @@ class Coordinator:
             graph.add_edges_from([(node.id, x.id) for x in node.get_neighbours()])
         return graph
 
+    # export the chord network in gml format in order to analize it with exernal programs like cytoscape
     def write_graph(self, path):
         nx.write_gml(self.get_graph(), path)
 
+    # plots a graphical representation of the network
     def print_ring(self):
         g = self.get_graph()
         nx.draw_circular(g, dim=2, with_labels=True, node_size=120, font_size=8)
 
+    # override the toString method
     def __repr__(self):
         out = ' '.join(['Nodes:', str(nodes), 'Bits:', str(bits)])
         out += '\n'
@@ -142,15 +159,12 @@ class Coordinator:
             out += str(node)
         return out + '\n'
 
-
+# Utility funtion that calculates the density of the netwotk
 def calculate_density(graph):
     return nx.density(graph)
 
 
-# def number_connected_components(graph):
-#     return nx.number_connected_components(graph.to_undirected())
-
-
+# Utility funciton that plots an histogram of the in degree distribution
 def in_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.in_degree()], reverse=True)  # degree sequence
     degreeCount = collections.Counter(degree_sequence)
@@ -162,15 +176,13 @@ def in_degree_histogram(graph, figure=None):
     plt.title("In Degree Histogram")
     plt.ylabel("Count")
     plt.xlabel("Degree")
-    # ax.set_xticks([d + 0.4 for d in deg])
-    # ax.set_xticklabels(deg)
 
     if figure is None:
         plt.show()
     else:
         plt.savefig(figure)
 
-
+# Utility funciton that plots an histogram of the out degree distribution
 def out_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.out_degree()], reverse=True)  # degree sequence
     degreeCount = collections.Counter(degree_sequence)
@@ -191,14 +203,18 @@ def out_degree_histogram(graph, figure=None):
         plt.savefig(figure)
 
 
+# Utility function that calculates the eccentricity of the network
 def calculate_eccentricity(graph):
     return sum(nx.eccentricity(graph).values())/len(nx.eccentricity(graph).values())
 
 
+# Utility function that calculates the diameter of the network
 def calculate_diameter(graph):
     return nx.diameter(graph)
 
 
+# Utility funciton that plots an histogram of the queries histogram
+# basically the number of queries routed by each node
 def queries_histogram(queries, figure=None):
     nodes = [item.id for sublist in queries for item in sublist[1:]]
     nodes = collections.Counter(nodes)
@@ -216,6 +232,7 @@ def queries_histogram(queries, figure=None):
         plt.savefig(figure)
 
 
+# Utility funciton that plots an histogram of the queries handled by each node
 def last_hop_histogram(queries, figure=None):
     nodes = [item[-1].id for item in queries]
     nodes = collections.Counter(nodes)
@@ -238,8 +255,6 @@ def main():
     print('Graph generated', file=sys.stderr)
     nx.write_gml(graph, filename)
     print('Graph saved', file=sys.stderr)
-    # print(number_connected_components(graph))
-    # print(coordinator)
     # coordinator.print_ring()
     # plt.show()
     in_degree_histogram(graph, './in_degree_histogram')
@@ -282,8 +297,8 @@ if __name__ == '__main__':
     print('Nodes', nodes)
     print('Bits', bits)
 
+    #Helper function to complute the sha1
     def sha1(key, n=n):
         return int(hashlib.sha1(str(key).encode()).hexdigest(), 16) % n
-        # return key
 
     main()
