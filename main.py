@@ -5,7 +5,6 @@ from collections import OrderedDict
 import hashlib
 from tabulate import tabulate
 import matplotlib.pyplot as plt
-import numpy as np
 import collections
 import operator
 import sys
@@ -14,6 +13,7 @@ nodes = None
 filename = None
 log_file = None
 length = None
+plot = None
 
 
 # Helper function to determine if a key falls within a range
@@ -57,10 +57,10 @@ class Node:
     def __init__(self, id):
         self.id = id
         self.n = n
-        self.finger_table = {}
+        self.finger_table = OrderedDict()
+        self.neighbours = None
         self.successor = None
         self.predecessor = None
-        self.neighbours = None
 
     # Since the network is assumed static after the creation of all the nodes this function is called in order to
     # fill the nodes finger table
@@ -70,20 +70,21 @@ class Node:
             # Optimization in order to find the correct node
             node = binary_search(Node.keys, ind)
             self.finger_table[ind] = nodes[node]
-        node = binary_search(Node.keys, self.id+1)
-        self.successor = nodes[node]
-        node = binary_search(Node.keys, self.id-1)
-        self.predecessor = nodes[node]
-    # return the neighbours of a node
 
+        node = binary_search(Node.keys, self.id+1 % self.n)
+        self.successor = nodes[node]
+        node = binary_search(Node.keys, self.id-1 % self.n)
+        self.predecessor = nodes[node]
+        self.neighbours = list(self.finger_table.values())
+        self.neighbours.reverse()
+
+    # return the neighbours of a node
     def get_neighbours(self):
         return self.finger_table.values()
 
     # Implemented fallowing the chord pseudocode, it returns the closest preceding node of id
     def close_preceding_node(self, id):
-        neighbours = list(self.get_neighbours())
-        neighbours.reverse()
-        for node in neighbours:
+        for node in self.neighbours:
             if in_range(node.id, self.id, id):
                 return node
         return self
@@ -184,6 +185,7 @@ def in_degree_histogram(graph, figure=None):
     else:
         plt.savefig(figure)
 
+
 # Utility funciton that plots an histogram of the out degree distribution
 def out_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.out_degree()], reverse=True)  # degree sequence
@@ -252,23 +254,25 @@ def last_hop_histogram(queries, figure=None):
 
 def main():
     coordinator = Coordinator(nodes, bits, n)
-    print('Initialized finished', file=sys.stderr)
+    print('Initialization finished', file=sys.stderr)
     graph = coordinator.get_graph()
     print('Graph generated', file=sys.stderr)
     nx.write_gml(graph, filename)
     print('Graph saved', file=sys.stderr)
-    # coordinator.print_ring()
-    # plt.show()
+    if plot:
+        coordinator.print_ring()
+        plt.show()
     in_degree_histogram(graph, './in_degree_histogram')
     out_degree_histogram(graph, './out_degree_histogram')
     print('Simulation started', file=sys.stderr)
     hops = []
-    for _ in range(length):
-        key = sha1(random.randrange(0, n))
-        node = np.random.choice(list(coordinator.nodes.keys()))
-        hops.append([])
-        coordinator.nodes[node].find_successor(key, hops[-1])
-        with open(log_file, 'a') as f:
+    keys = list(coordinator.nodes.keys())
+    with open(log_file, 'w') as f:
+        for _ in range(length):
+            key = sha1(random.randrange(0, n))
+            node = random.randrange(0, nodes)
+            hops.append([])
+            coordinator.nodes[keys[node]].find_successor(key, hops[-1])
             print(*[x.id for x in hops[-1]], file=f)
     print('Simulation finished', file=sys.stderr)
     queries_histogram(hops, './queries_histogram')
@@ -288,6 +292,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--filename', type=str, default='./network')
     parser.add_argument('-l', '--log_file', type=str, default='./logfile.txt')
     parser.add_argument('-d', '--length', type=int, default='10000')
+    parser.add_argument('-p', '--plot', type=bool, default=False)
     args = parser.parse_args()
     bits = args.bits
     n = 2 << (bits-1)
@@ -296,6 +301,7 @@ if __name__ == '__main__':
     random.seed(args.seed)
     log_file = args.log_file
     length = args.length
+    plot = args.plot
     print('Nodes', nodes)
     print('Bits', bits)
 
