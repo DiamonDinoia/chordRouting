@@ -45,6 +45,7 @@ class Node:
     bits = 0
     verbose = False
     stats = False
+    keys = None
 
     # Static method used to determine the address of the finger table
     @staticmethod
@@ -59,23 +60,22 @@ class Node:
         self.finger_table = {}
         self.successor = None
         self.predecessor = None
+        self.neighbours = None
 
-    # Since the network is assumed stati after the creation of all the nodes this function is called in order to
+    # Since the network is assumed static after the creation of all the nodes this function is called in order to
     # fill the nodes finger table
     def init_finger_table(self, nodes):
         for i in range(0, self.bits):
             ind = Node.get_id(self.id, i, self.n)
-            node = ind
-            if ind not in nodes:
-                # Optimization in order to find the correct node
-                node = binary_search(list(nodes.keys()), ind)
+            # Optimization in order to find the correct node
+            node = binary_search(Node.keys, ind)
             self.finger_table[ind] = nodes[node]
-            if i == 0:
-                self.successor = nodes[node]
-        node = binary_search(list(nodes.keys()), self.id-1)
+        node = binary_search(Node.keys, self.id+1)
+        self.successor = nodes[node]
+        node = binary_search(Node.keys, self.id-1)
         self.predecessor = nodes[node]
-
     # return the neighbours of a node
+
     def get_neighbours(self):
         return self.finger_table.values()
 
@@ -110,7 +110,8 @@ class Node:
     def __eq__(self, other):
         return self.id == other.id
 
-# Utility class used to initialize and pereform the simulation
+
+# Utility class used to initialize and perform the simulation
 class Coordinator:
 
     # Helpler function that create and initialize all the nodes of the swarm
@@ -130,6 +131,7 @@ class Coordinator:
     def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
         self.init_nodes(nodes, bits, n)
+        Node.keys = list(self.nodes.keys())
         for node in self.nodes.values():
             # print(node.id, file=sys.stderr)
             node.init_finger_table(self.nodes)
