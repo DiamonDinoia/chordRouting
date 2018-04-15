@@ -162,6 +162,7 @@ class Coordinator:
             out += str(node)
         return out + '\n'
 
+
 # Utility funtion that calculates the density of the netwotk
 def calculate_density(graph):
     return nx.density(graph)
@@ -209,12 +210,28 @@ def out_degree_histogram(graph, figure=None):
 
 # Utility function that calculates the eccentricity of the network
 def calculate_eccentricity(graph):
-    return sum(nx.eccentricity(graph).values())/len(nx.eccentricity(graph).values())
+    return nx.eccentricity(graph)
+
+
+# Utility function that calculates the average eccentricity of the network
+def plot_eccentricity_histogram(eccentricity, figure):
+    nodes = list(eccentricity.values())
+    nodes.sort(reverse=True)
+    fig, ax = plt.subplots()
+    plt.bar(range(len(nodes)), nodes, color='b')
+
+    plt.title("Eccentricity Histogram")
+    plt.ylabel("eccentricity")
+    ax.set_xticklabels([])
+    if figure is None:
+        plt.show()
+    else:
+        plt.savefig(figure)
 
 
 # Utility function that calculates the diameter of the network
-def calculate_diameter(graph):
-    return nx.diameter(graph)
+def calculate_diameter(graph, eccentricity=None):
+    return nx.diameter(graph, eccentricity)
 
 
 # Utility funciton that plots an histogram of the queries histogram
@@ -236,6 +253,22 @@ def queries_histogram(queries, figure=None):
         plt.savefig(figure)
 
 
+def path_length_histogram(queries, figure=None):
+    queries = collections.Counter(queries)
+    length, cnt = zip(*queries.items())
+    fig, ax = plt.subplots()
+    plt.bar(length, cnt, width=0.80, color='b')
+    plt.title("Path length Histogram")
+    plt.ylabel("Number of paths")
+    plt.xlabel("Length")
+    ax.set_xticks(length)
+    ax.set_xticklabels(length)
+    if figure is None:
+        plt.show()
+    else:
+        plt.savefig(figure)
+
+
 # Utility funciton that plots an histogram of the queries handled by each node
 def last_hop_histogram(queries, figure=None):
     nodes = [item[-1].id for item in queries]
@@ -246,11 +279,15 @@ def last_hop_histogram(queries, figure=None):
     plt.bar(range(len(cnt)), cnt, color='b')
     plt.title("Last Hop Histogram")
     plt.ylabel("Number of queries routed")
+    ax.set_xticklabels([])
     if figure is None:
         plt.show()
     else:
         plt.savefig(figure)
 
+
+def avg_clustering_coefficient(graph):
+    return nx.average_clustering(graph)
 
 def main():
     coordinator = Coordinator(nodes, bits, n)
@@ -262,6 +299,7 @@ def main():
     if plot:
         coordinator.print_ring()
         plt.show()
+    # print('Average clustering coefficient', avg_clustering_coefficient(graph))
     in_degree_histogram(graph, './in_degree_histogram')
     out_degree_histogram(graph, './out_degree_histogram')
     print('Simulation started', file=sys.stderr)
@@ -278,10 +316,13 @@ def main():
     queries_histogram(hops, './queries_histogram')
     last_hop_histogram(hops, './last_hop_histogram')
     hops = [len(x)-1 for x in hops]
+    path_length_histogram(hops, './path_length_histogram')
     print('Average path length', sum(hops)/len(hops))
+    print('Maximum path length', max(hops))
     print('Density', calculate_density(graph))
-    print('Eccentricity', calculate_eccentricity(graph))
-    print('Diameter', calculate_diameter(graph))
+    eccentricity = calculate_eccentricity(graph)
+    plot_eccentricity_histogram(eccentricity, './eccentricity_histogram')
+    print('Diameter', calculate_diameter(graph, eccentricity))
 
 
 if __name__ == '__main__':
@@ -289,9 +330,9 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--nodes', type=int, default=1000)
     parser.add_argument('-b', '--bits', type=int, default=11)
     parser.add_argument('-s', '--seed', type=int, default=42)
-    parser.add_argument('-f', '--filename', type=str, default='./network')
+    parser.add_argument('-f', '--filename', type=str, default='./network.gml')
     parser.add_argument('-l', '--log_file', type=str, default='./logfile.txt')
-    parser.add_argument('-d', '--length', type=int, default='10000')
+    parser.add_argument('-d', '--length', type=int, default=10000)
     parser.add_argument('-p', '--plot', type=bool, default=False)
     args = parser.parse_args()
     bits = args.bits
