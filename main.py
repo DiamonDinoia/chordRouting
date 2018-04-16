@@ -18,11 +18,12 @@ plot = None
 
 # Helper function to determine if a key falls within a range
 def in_range(key, a, b):
-    # is c in (a,b) mod (2**bits)
+    # key, a, b are assumed mod (m) otherwise it does not works
+    # is c in (a,b) mod (m)
     return (a < key < b) if b > a else (key > a or key < b)
 
 
-# Helper function used to determine the closest preceeding node
+# Helper function used to determine the closest preceding node
 # when initializing the finger tables
 def binary_search(l, elem):
     first = 0
@@ -54,6 +55,7 @@ class Node:
             return (id+1) % n
         return (id + (2 << (exp-1))) % n
 
+    # Constructor that initialize the data structures
     def __init__(self, id):
         self.id = id
         self.n = n
@@ -80,11 +82,14 @@ class Node:
 
     # return the neighbours of a node
     def get_neighbours(self):
-        return self.finger_table.values()
+        neighbours = list(self.finger_table.values())
+        neighbours.extend([self.successor, self.predecessor])
+        return neighbours
 
-    # Implemented fallowing the chord pseudocode, it returns the closest preceding node of id
+    # Implemented from the chord pseudocode, it returns the closest preceding node of id
     def close_preceding_node(self, id):
         for node in self.neighbours:
+            # check if node.id is in (self.id, id)
             if in_range(node.id, self.id, id):
                 return node
         return self
@@ -101,13 +106,13 @@ class Node:
         node = self.close_preceding_node(id)
         return node.find_successor(id, nodes)
 
-    # Override of the to string method in order to have a nice representation of the node
+    # Override of the to_string method in order to have a nice tabular representation of the node
     def __repr__(self):
         t = 'Node ' + str(self.id) + ' Finger table\n'
         t += tabulate([(x, y.id) for x, y in self.finger_table.items()], headers=['Address', 'Node'], tablefmt='orgtbl')
         return str(t) + '\n'
 
-    # Override of the equal method
+    # Override of the equals method
     def __eq__(self, other):
         return self.id == other.id
 
@@ -115,7 +120,7 @@ class Node:
 # Utility class used to initialize and perform the simulation
 class Coordinator:
 
-    # Helpler function that create and initialize all the nodes of the swarm
+    # Helper function that create all the nodes in the network
     def init_nodes(self, nodes, bits, n):
         Node.bits = bits
         while len(self.nodes) < nodes:
@@ -131,10 +136,11 @@ class Coordinator:
     # Simple constructor that perform basic initialization of the data structures
     def __init__(self, nodes, bits, n):
         self.nodes = OrderedDict()
+        # Create all nodes in the network
         self.init_nodes(nodes, bits, n)
         Node.keys = list(self.nodes.keys())
+        # Initialize all finger tables
         for node in self.nodes.values():
-            # print(node.id, file=sys.stderr)
             node.init_finger_table(self.nodes)
 
     # returns a networkx graph representing the chord network
@@ -154,21 +160,21 @@ class Coordinator:
         g = self.get_graph()
         nx.draw_circular(g, dim=2, with_labels=True, node_size=120, font_size=8)
 
-    # override the toString method
+    # override the toString method in order to have a nice network representation
     def __repr__(self):
         out = ' '.join(['Nodes:', str(nodes), 'Bits:', str(bits)])
         out += '\n'
         for node in self.nodes.values():
-            out += str(node)
-        return out + '\n'
+            out += str(node.id) + ' -> '
+        return out[:-4] + '\n'
 
 
-# Utility funtion that calculates the density of the netwotk
+# Utility function that calculates the density of the network
 def calculate_density(graph):
     return nx.density(graph)
 
 
-# Utility funciton that plots an histogram of the in degree distribution
+# Utility function that plots an histogram of the in degree distribution
 def in_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.in_degree()], reverse=True)  # degree sequence
     degreeCount = collections.Counter(degree_sequence)
@@ -187,7 +193,7 @@ def in_degree_histogram(graph, figure=None):
         plt.savefig(figure)
 
 
-# Utility funciton that plots an histogram of the out degree distribution
+# Utility function that plots an histogram of the out degree distribution
 def out_degree_histogram(graph, figure=None):
     degree_sequence = sorted([d for n, d in graph.out_degree()], reverse=True)  # degree sequence
     degreeCount = collections.Counter(degree_sequence)
@@ -253,6 +259,7 @@ def queries_histogram(queries, figure=None):
         plt.savefig(figure)
 
 
+# Utility function that plots an histogram ho the path length
 def path_length_histogram(queries, figure=None):
     queries = collections.Counter(queries)
     length, cnt = zip(*queries.items())
@@ -269,7 +276,7 @@ def path_length_histogram(queries, figure=None):
         plt.savefig(figure)
 
 
-# Utility funciton that plots an histogram of the queries handled by each node
+# Utility function that plots an histogram of the queries handled by each node
 def last_hop_histogram(queries, figure=None):
     nodes = [item[-1].id for item in queries]
     nodes = collections.Counter(nodes)
@@ -286,9 +293,7 @@ def last_hop_histogram(queries, figure=None):
         plt.savefig(figure)
 
 
-def avg_clustering_coefficient(graph):
-    return nx.average_clustering(graph)
-
+# Main of the program
 def main():
     coordinator = Coordinator(nodes, bits, n)
     print('Initialization finished', file=sys.stderr)
@@ -325,6 +330,7 @@ def main():
     print('Diameter', calculate_diameter(graph, eccentricity))
 
 
+# Command line arguments parsing and global variables initialization
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--nodes', type=int, default=1000)
@@ -346,7 +352,7 @@ if __name__ == '__main__':
     print('Nodes', nodes)
     print('Bits', bits)
 
-    #Helper function to complute the sha1
+    # Helper function to compute the sha1
     def sha1(key, n=n):
         return int(hashlib.sha1(str(key).encode()).hexdigest(), 16) % n
 
