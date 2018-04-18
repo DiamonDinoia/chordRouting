@@ -157,8 +157,8 @@ class Coordinator:
 
     # plots a graphical representation of the network
     def print_ring(self):
-        g = self.get_graph()
-        nx.draw_circular(g, dim=2, with_labels=True, node_size=120, font_size=8)
+        g = self.get_graph().to_undirected()
+        nx.draw_circular(g, dim=2, with_labels=False, node_size=10, font_size=8, width=0.1)
 
     # override the toString method in order to have a nice network representation
     def __repr__(self):
@@ -304,6 +304,7 @@ def main():
     if plot:
         coordinator.print_ring()
         plt.show()
+        # plt.savefig('overlay_big')
     # print('Average clustering coefficient', avg_clustering_coefficient(graph))
     in_degree_histogram(graph, './in_degree_histogram')
     out_degree_histogram(graph, './out_degree_histogram')
